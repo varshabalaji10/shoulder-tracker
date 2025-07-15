@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Physio Tracker</title>
+  <style>
+    body { margin:0; font-family:Arial,sans-serif; display:flex; flex-direction:column; align-items:center; }
+    #session-controls, .hand-controls, #controls { margin:10px; display:flex; gap:10px; align-items:center; }
+    #output { border:1px solid #444; width:640px; height:480px; }
+    button, input { padding:6px 10px; }
+    #set-counter { margin-top:10px; font-size:1.1em; }
+  </style>
+</head>
+<body>
+  <h2>Physio Tracker</h2>
+
+  <div id="session-controls">
+    <label>Reps/Set: <input type="number" id="repsPerSet" value="10" min="1"></label>
+    <label>Sets:     <input type="number" id="totalSets" value="3" min="1"></label>
+    <label>Rest (s): <input type="number" id="restSeconds" value="30" min="5"></label>
+  </div>
+
+  <div class="hand-controls">
+    <label><input type="radio" name="hand" value="right" checked> Right Arm</label>
+    <label><input type="radio" name="hand" value="left">  Left Arm</label>
+  </div>
+
+  <canvas id="output"></canvas>
+  <video id="video" playsinline style="display:none;"></video>
+
+  <div id="controls">
+    <button id="start">Start Session</button>
+    <button id="pause">Pause</button>
+    <button id="stop">Stop</button>
+  </div>
+
+  <div id="set-counter">Set 0/0 • Rep 0/0</div>
+
+  <!-- MediaPipe libs -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
