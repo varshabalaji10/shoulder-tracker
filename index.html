@@ -1,46 +1,117 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Physio Tracker</title>
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+
   <style>
-    body { margin:0; font-family:Arial,sans-serif; display:flex; flex-direction:column; align-items:center; }
-    #session-controls, .hand-controls, #controls { margin:10px; display:flex; gap:10px; align-items:center; }
-    #output { border:1px solid #444; width:640px; height:480px; }
-    button, input { padding:6px 10px; }
-    #set-counter { margin-top:10px; font-size:1.1em; }
+    :root {
+      --primary: #4e54c8;
+      --secondary: #8f94fb;
+      --accent: #f9a826;
+      --bg: #f0f4f8;
+      --text: #333;
+      --btn-bg: #4e54c8;
+      --btn-hover: #3b3f9f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+    }
+    h2 {
+      margin-bottom: 1rem;
+      font-weight: 600;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .card {
+      background: white;
+      border-radius: 1rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 720px;
+      margin-bottom: 2rem;
+    }
+    .controls, .session-controls, .hand-controls {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .controls input[type="number"] {
+      width: 4rem;
+      padding: 0.4rem;
+      border: 1px solid #ccc;
+      border-radius: 0.5rem;
+    }
+    .controls label {
+      font-weight: 500;
+    }
+    button {
+      background: var(--btn-bg);
+      color: white;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: var(--btn-hover);
+    }
+    #output {
+      border-radius: 1rem;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      margin-bottom: 1rem;
+      background: black;
+    }
+    #set-counter {
+      font-size: 1.1rem;
+      margin-top: 0.5rem;
+      text-align: center;
+      font-weight: 500;
+    }
   </style>
 </head>
 <body>
   <h2>Physio Tracker</h2>
-
-  <div id="session-controls">
-    <label>Reps/Set: <input type="number" id="repsPerSet" value="10" min="1"></label>
-    <label>Sets:     <input type="number" id="totalSets" value="3" min="1"></label>
-    <label>Rest (s): <input type="number" id="restSeconds" value="30" min="5"></label>
+  <div class="card">
+    <div class="session-controls">
+      <label>Reps/Set: <input type="number" id="repsPerSet" value="10" min="1"></label>
+      <label>Sets:     <input type="number" id="totalSets" value="3" min="1"></label>
+      <label>Rest (s): <input type="number" id="restSeconds" value="30" min="5"></label>
+    </div>
+    <div class="hand-controls">
+      <label><input type="radio" name="hand" value="right" checked> Right Arm</label>
+      <label><input type="radio" name="hand" value="left">  Left Arm</label>
+    </div>
+    <canvas id="output" width="640" height="480"></canvas>
+    <video id="video" playsinline style="display:none;"></video>
+    <div class="controls">
+      <button id="start">Start</button>
+      <button id="pause">Pause</button>
+      <button id="stop">Stop</button>
+    </div>
+    <div id="set-counter">Set 0/0 • Rep 0/0</div>
   </div>
-
-  <div class="hand-controls">
-    <label><input type="radio" name="hand" value="right" checked> Right Arm</label>
-    <label><input type="radio" name="hand" value="left">  Left Arm</label>
-  </div>
-
-  <canvas id="output"></canvas>
-  <video id="video" playsinline style="display:none;"></video>
-
-  <div id="controls">
-    <button id="start">Start Session</button>
-    <button id="pause">Pause</button>
-    <button id="stop">Stop</button>
-  </div>
-
-  <div id="set-counter">Set 0/0 • Rep 0/0</div>
-
   <!-- MediaPipe libs -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
   <script src="script.js"></script>
 </body>
 </html>
