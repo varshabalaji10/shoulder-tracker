@@ -23,7 +23,9 @@ let repsInSet     = 0;
 let isRunning     = false;
 let isPaused      = false;
 let inRest        = false;
-let restEndTime   = 0;       // timestamp when rest finishes
+let restEndTime   = 0;
+let lastWrongArmSpeakTime = 0;
+
 
 // 3) Rep‐state machine
 let stage         = 'down';  // down → up → hold → down
@@ -82,23 +84,32 @@ function startRest() {
 // 9) Record a rep & advance sets
 function recordRep() {
   repsInSet++;
-  // Speak the rep count itself:
-  speechSynthesis.speak(new SpeechSynthesisUtterance(repsInSet.toString()));
+  // Speak the rep count itself
+  speak(repsInSet.toString());
+  playSound('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg');
   updateSetDisplay();
 
-  // Advance to rest or next set as before
-  if (repsInSet >= parseInt(repsInput.value, 10)) {
-    currentSet++;
-    repsInSet = 0;
-    updateSetDisplay();
-    if (currentSet > parseInt(setsInput.value, 10)) {
+  const totalReps = parseInt(repsInput.value, 10);
+  const totalSets = parseInt(setsInput.value, 10);
+
+  // If we’ve finished the reps for this set:
+  if (repsInSet >= totalReps) {
+    // Announce this set’s completion
+    if (currentSet < totalSets) {
+      startRest(currentSet);
+      // Prepare for next set
+      currentSet++;
+      repsInSet = 0;
+      updateSetDisplay();
+    } else {
+      // Last set done: finish session, no more rest
       speak('Session complete. Great job!');
       isRunning = false;
-      return;
+      // leave camera running so video doesn’t “stick”
     }
-    startRest();
   }
 }
+
 
 
 // 10) onResults — draws video, overlays, and runs rep logic
@@ -107,7 +118,7 @@ function onResults(results) {
   ctx.clearRect(0,0,640,480);
   ctx.drawImage(results.image,0,0,640,480);
 
-  // 10a) Overlay rest timer if inRest
+  // Overlay rest timer if inRest
   if (inRest) {
     const remaining = Math.ceil((restEndTime - performance.now()) / 1000);
     if (remaining > 0) {
@@ -115,35 +126,74 @@ function onResults(results) {
       ctx.fillText(formatTime(remaining), 240, 250);
       return;
     } else {
-      // rest done
       inRest = false;
       playSound('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg');
       speak(`Rest over. Starting set ${currentSet}`);
     }
   }
 
-  // 10b) Overlay “Session Complete” if finished
+  // Overlay “Session Complete” if finished
   if (!isRunning && !inRest) {
     ctx.font='36px Arial'; ctx.fillStyle='lightgreen';
     ctx.fillText('Session Complete', 180, 250);
     return;
   }
 
-  // 10c) Overlay “Paused” if paused
+  // Overlay “Paused” if paused
   if (isPaused) {
     ctx.font='36px Arial'; ctx.fillStyle='yellow';
     ctx.fillText('Paused', 280, 250);
     return;
   }
 
-  // 10d) If no pose, skip
   if (!results.poseLandmarks) return;
 
-  // 10e) Draw skeleton
-  drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { lineWidth:2 });
-  drawLandmarks(ctx, results.poseLandmarks, { lineWidth:1 });
+  // Draw skeleton
+  // Only draw the wrist landmark (and elbow if you like)
+const handLandmarkIndices = hand === 'right'
+  ? [14, 16]    // right elbow + right wrist
+  : [13, 15];   // left  elbow + left  wrist
 
-  // 10f) Stance check
+// grab just those landmarks
+const handLandmarks = handLandmarkIndices
+  .map(i => results.poseLandmarks[i]);
+
+// draw big dots on them
+drawLandmarks(ctx, handLandmarks, {
+  color: 'cyan',
+  lineWidth: 6,
+});
+
+  // ←—— INSERT THE WRONG-ARM CHECK HERE ———→
+  // WRONG-ARM CHECK (with voice)
+{
+  const oppShoulderIdx = hand === 'right' ? 11 : 12;
+  const oppWristIdx    = hand === 'right' ? 15 : 16;
+
+  const oppShoulderY = results.poseLandmarks[oppShoulderIdx].y;
+  const oppWristY    = results.poseLandmarks[oppWristIdx].y;
+
+  if (oppWristY < oppShoulderY - UP_THRESH) {
+    const message = `Please lift your ${hand} arm`;
+    // draw text
+    ctx.font      = '20px Arial';
+    ctx.fillStyle = 'yellow';
+    ctx.fillText(message, 10, 30);
+
+    // throttle speaking to once every 2s
+    const now = performance.now();
+    if (now - lastWrongArmSpeakTime > 2000) {
+      speak(message);
+      lastWrongArmSpeakTime = now;
+    }
+    return;
+  }
+}
+
+  // ←—————— END WRONG-ARM CHECK ——————→
+
+
+  // Stance check
   const sIdx = hand==='right'?12:11;
   const shoulderY = results.poseLandmarks[sIdx].y;
   if (shoulderY > STAND_THRESH) {
@@ -152,7 +202,7 @@ function onResults(results) {
     return;
   }
 
-  // 10g) Elbow‐extension check
+  // Elbow‐extension check
   const eIdx = hand==='right'?14:13;
   const wIdx = hand==='right'?16:15;
   const angle = angleBetween(
@@ -170,13 +220,13 @@ function onResults(results) {
     return;
   }
 
-  // 10h) Draw shoulder line
+  // Draw shoulder line
   const lineY = shoulderY * 480;
   ctx.beginPath();
   ctx.moveTo(0, lineY); ctx.lineTo(640, lineY);
   ctx.strokeStyle='red'; ctx.lineWidth=2; ctx.stroke();
 
-  // 10i) Rep state machine with hold‐time
+  // Rep state machine with hold‐time
   const wY = results.poseLandmarks[wIdx].y;
   const now = performance.now();
   let feedback = '';
@@ -206,37 +256,40 @@ function onResults(results) {
     }
   }
 
-  // 10j) Draw feedback text
+  // Draw feedback text
   ctx.font='20px Arial'; ctx.fillStyle='yellow';
   ctx.fillText(feedback, 10, 30);
 }
 
 // 11) MediaPipe initialization
-const pose = new Pose({ locateFile: f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+const pose = new Pose({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+});
 pose.setOptions({
-  modelComplexity: 1,
-  smoothLandmarks: true,
+  modelComplexity:        1,
+  smoothLandmarks:        true,
   minDetectionConfidence: 0.5,
-  minTrackingConfidence: 0.5
+  minTrackingConfidence:  0.5
 });
 pose.onResults(onResults);
 
-// 12) Camera helper
+// 12) Camera helper (front‐facing camera)
 const camera = new Camera(videoElement, {
-  onFrame: async()=>await pose.send({ image: videoElement }),
+  onFrame: async () => await pose.send({ image: videoElement }),
   width: 640,
-  height: 480
+  height: 480,
+  facingMode: 'user'
 });
 
 // 13) Button handlers
 startBtn.onclick = () => {
   if (!isRunning) {
     currentSet = 1;
-    repsInSet = 0;
-    inRest = false;
-    stage = 'down';
+    repsInSet  = 0;
+    inRest     = false;
+    stage      = 'down';
     updateSetDisplay();
-    camera.start().then(()=>{
+    camera.start().then(() => {
       isRunning = true;
       speak(`Starting session: ${setsInput.value} sets of ${repsInput.value} reps`);
     });
@@ -251,10 +304,9 @@ pauseBtn.onclick = () => {
 stopBtn.onclick = () => {
   camera.stop();
   isRunning = isPaused = inRest = false;
-  restEndTime = 0;
   currentSet = repsInSet = 0;
-  stage = 'down';
+  stage      = 'down';
   updateSetDisplay();
-  ctx.clearRect(0,0,640,480);
+  ctx.clearRect(0, 0, 640, 480);
   speak('Session stopped');
 };
